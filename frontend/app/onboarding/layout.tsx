@@ -1,11 +1,10 @@
 import { redirect } from "next/navigation";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
-import { DashboardShell } from "@/components/DashboardShell";
 
 export const revalidate = 0;
 
-export default async function DashboardLayout({
+export default async function OnboardingLayout({
   children,
 }: {
   children: React.ReactNode;
@@ -40,5 +39,5 @@ export default async function DashboardLayout({
     redirect("/auth");
   }
 
-  return <DashboardShell>{children}</DashboardShell>;
+  return <>{children}</>;
 }

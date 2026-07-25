@@ -24,6 +24,15 @@ function AuthForm() {
 
   const supabase = createClient();
 
+  useEffect(() => {
+    async function checkUser() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        router.push("/dashboard");
+      }
+    }
+    checkUser();
+  }, [router, supabase]);
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
