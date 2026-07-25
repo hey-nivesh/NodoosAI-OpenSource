@@ -1,0 +1,17 @@
+name: Autonomous Churn Detection Cron
+
+on:
+  schedule:
+    # Run every 6 hours
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+
+jobs:
+  run-agent:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Agent Run-All API Endpoint
+        run: |
+          curl -X POST "${{ secrets.BACKEND_API_URL }}/api/agent/run-all" \
+            -H "Content-Type: application/json" \
+            --fail-with-body
