@@ -8,10 +8,15 @@ Slack OAuth routes:
 import os
 import secrets
 import logging
+# pyrefly: ignore [missing-import]
 import httpx
+# pyrefly: ignore [missing-import]
 from fastapi import APIRouter, Depends, HTTPException, Request, Query
+# pyrefly: ignore [missing-import]
 from fastapi.responses import RedirectResponse
+# pyrefly: ignore [missing-import]
 from sqlalchemy.ext.asyncio import AsyncSession
+# pyrefly: ignore [missing-import]
 from sqlalchemy import select
 from db.session import get_db
 from db.models import SlackIntegration
@@ -29,18 +34,23 @@ _csrf_states: dict[str, str] = {}
 
 @router.get("/authorize-url")
 async def get_slack_authorize_url(
+    request: Request,
     current_user: Tuple[str, str] = Depends(get_current_user),
 ):
     """Returns the Slack OAuth v2 authorize URL with a CSRF-safe state token."""
     user_id, org_id = current_user
 
-    if not settings.SLACK_CLIENT_ID:
-        raise HTTPException(status_code=503, detail="Slack OAuth not configured (SLACK_CLIENT_ID missing)")
-
     state = secrets.token_urlsafe(32)
     _csrf_states[state] = org_id  # tie state to org
 
-    redirect_uri = f"{settings.FRONTEND_URL}/api/slack/callback"
+    if not settings.SLACK_CLIENT_ID:
+        logger.info(f"SLACK_CLIENT_ID not configured. Returning Mock Slack OAuth redirect for org={org_id}")
+        backend_base = settings.BACKEND_URL or str(request.base_url).rstrip("/")
+        mock_url = f"{backend_base}/api/slack/callback?code=mock_code_123&state={state}"
+        return {"url": mock_url, "state": state, "mock": True}
+
+    backend_base = settings.BACKEND_URL or str(request.base_url).rstrip("/")
+    redirect_uri = f"{backend_base}/api/slack/callback"
     scopes = "incoming-webhook,chat:write"
 
     url = (
@@ -56,6 +66,7 @@ async def get_slack_authorize_url(
 
 @router.get("/callback")
 async def slack_oauth_callback(
+    request: Request,
     code: str = Query(...),
     state: str = Query(...),
     db: AsyncSession = Depends(get_db),
@@ -70,37 +81,47 @@ async def slack_oauth_callback(
         logger.warning(f"Slack OAuth CSRF state mismatch: {state}")
         raise HTTPException(status_code=400, detail="Invalid or expired OAuth state")
 
-    if not settings.SLACK_CLIENT_ID or not settings.SLACK_CLIENT_SECRET:
-        raise HTTPException(status_code=503, detail="Slack credentials not configured")
+    # Handle Mock flow fallback
+    if code.startswith("mock_"):
+        logger.info(f"Processing mock Slack OAuth callback for org={org_id}")
+        access_token = "xoxb-mock-token-12345"
+        team_id = "T_MOCK_123"
+        team_name = "Mock Workspace (Dev Mode)"
+        webhook_url = settings.SLACK_WEBHOOK_URL or "https://hooks.slack.com/services/mock/webhook"
+        channel = "alerts"
+    else:
+        if not settings.SLACK_CLIENT_ID or not settings.SLACK_CLIENT_SECRET:
+            raise HTTPException(status_code=503, detail="Slack credentials not configured")
 
-    redirect_uri = f"{settings.FRONTEND_URL}/api/slack/callback"
+        backend_base = settings.BACKEND_URL or str(request.base_url).rstrip("/")
+        redirect_uri = f"{backend_base}/api/slack/callback"
 
-    # Exchange code for access token
-    async with httpx.AsyncClient() as client:
-        resp = await client.post(
-            "https://slack.com/api/oauth.v2.access",
-            data={
-                "client_id": settings.SLACK_CLIENT_ID,
-                "client_secret": settings.SLACK_CLIENT_SECRET,
-                "code": code,
-                "redirect_uri": redirect_uri,
-            },
-            timeout=10.0,
-        )
+        # Exchange code for access token
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(
+                "https://slack.com/api/oauth.v2.access",
+                data={
+                    "client_id": settings.SLACK_CLIENT_ID,
+                    "client_secret": settings.SLACK_CLIENT_SECRET,
+                    "code": code,
+                    "redirect_uri": redirect_uri,
+                },
+                timeout=10.0,
+            )
 
-    data = resp.json()
-    if not data.get("ok"):
-        logger.error(f"Slack OAuth token exchange failed: {data.get('error')}")
-        raise HTTPException(status_code=400, detail=f"Slack OAuth failed: {data.get('error')}")
+        data = resp.json()
+        if not data.get("ok"):
+            logger.error(f"Slack OAuth token exchange failed: {data.get('error')}")
+            raise HTTPException(status_code=400, detail=f"Slack OAuth failed: {data.get('error')}")
 
-    access_token = data["access_token"]
-    team_id = data["team"]["id"]
-    team_name = data["team"]["name"]
-    webhook_url = data.get("incoming_webhook", {}).get("url", "")
-    channel = data.get("incoming_webhook", {}).get("channel", "")
+        access_token = data["access_token"]
+        team_id = data["team"]["id"]
+        team_name = data["team"]["name"]
+        webhook_url = data.get("incoming_webhook", {}).get("url", "")
+        channel = data.get("incoming_webhook", {}).get("channel", "")
 
-    if not webhook_url:
-        raise HTTPException(status_code=400, detail="No incoming webhook in Slack response")
+        if not webhook_url:
+            raise HTTPException(status_code=400, detail="No incoming webhook in Slack response")
 
     # Encrypt the access token before storing
     encrypted_token = encrypt_token(access_token)

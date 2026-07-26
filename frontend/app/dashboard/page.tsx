@@ -1,3 +1,6 @@
+"use client";
+
+import { useState, useEffect, useCallback } from "react";
 import { fetchAtRiskAccounts, fetchActionsLog } from "@/lib/api";
 import { AccountsTable } from "@/components/AccountsTable";
 import { RunAgentButton } from "@/components/RunAgentButton";
@@ -9,9 +12,8 @@ import {
   TrendingUp,
   TrendingDown,
   Clock,
+  RefreshCw,
 } from "lucide-react";
-
-export const revalidate = 0;
 
 function StatCard({
   title,
@@ -162,13 +164,30 @@ function AgentHealthCard() {
   );
 }
 
-export default async function DashboardPage() {
-  const [accounts, actionsData] = await Promise.all([
-    fetchAtRiskAccounts(),
-    fetchActionsLog(),
-  ]);
+export default function DashboardPage() {
+  const [accounts, setAccounts] = useState<any[]>([]);
+  const [actions, setActions] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const actions = actionsData.actions || [];
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [accs, actionsData] = await Promise.all([
+        fetchAtRiskAccounts(),
+        fetchActionsLog(),
+      ]);
+      setAccounts(accs);
+      setActions(actionsData.actions || []);
+    } catch (err) {
+      console.error("Dashboard load error:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const totalArr = accounts.reduce((s, a) => s + a.arr, 0);
   const avgDrop = accounts.length
@@ -188,14 +207,24 @@ export default async function DashboardPage() {
             7-day vs 28-day moving average scanning · Groq LLM Sentiment · Rules Matrix Playbooks
           </p>
         </div>
-        <RunAgentButton />
+        <div className="flex items-center gap-3">
+          <button
+            onClick={loadData}
+            disabled={loading}
+            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-3.5 py-2 text-xs font-semibold text-foreground hover:bg-muted transition-colors disabled:opacity-50"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
+            Refresh
+          </button>
+          <RunAgentButton onComplete={loadData} />
+        </div>
       </div>
 
       {/* Stats Row */}
       <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
         <StatCard
           title="At-Risk Accounts"
-          value={String(accounts.length)}
+          value={loading ? "—" : String(accounts.length)}
           sub="Detected churn signals"
           icon={ShieldAlert}
           trend="+2 this week"
@@ -204,7 +233,7 @@ export default async function DashboardPage() {
         />
         <StatCard
           title="ARR at Risk"
-          value={`$${(totalArr / 1000).toFixed(0)}k`}
+          value={loading ? "—" : `$${(totalArr / 1000).toFixed(0)}k`}
           sub="Annual revenue exposed"
           icon={DollarSign}
           trend={accounts.length > 0 ? "High exposure" : "Stable"}
@@ -213,7 +242,7 @@ export default async function DashboardPage() {
         />
         <StatCard
           title="Avg Usage Drop"
-          value={`-${avgDrop.toFixed(1)}%`}
+          value={loading ? "—" : `-${avgDrop.toFixed(1)}%`}
           sub="vs 28-day average"
           icon={Activity}
           trend="7-day window"
@@ -222,7 +251,7 @@ export default async function DashboardPage() {
         />
         <StatCard
           title="Playbooks Triggered"
-          value={String(actions.length)}
+          value={loading ? "—" : String(actions.length)}
           sub="Total rescue actions"
           icon={CheckCircle2}
           trend="All time"
@@ -231,24 +260,35 @@ export default async function DashboardPage() {
         />
       </div>
 
-      {/* Main Content Grid */}
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-        {/* Left — Accounts Table (2/3 width) */}
-        <div className="xl:col-span-2 space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-bold tracking-tight text-foreground">
-              Flagged Churn Risk Accounts ({accounts.length})
-            </h2>
+      {/* Skeleton overlay during first load */}
+      {loading ? (
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+          <div className="xl:col-span-2 h-64 rounded-2xl border border-border bg-surface animate-pulse" />
+          <div className="space-y-5">
+            <div className="h-48 rounded-2xl border border-border bg-surface animate-pulse" />
+            <div className="h-48 rounded-2xl border border-border bg-surface animate-pulse" />
           </div>
-          <AccountsTable accounts={accounts} />
         </div>
+      ) : (
+        /* Main Content Grid */
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+          {/* Left — Accounts Table (2/3 width) */}
+          <div className="xl:col-span-2 space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-bold tracking-tight text-foreground">
+                Flagged Churn Risk Accounts ({accounts.length})
+              </h2>
+            </div>
+            <AccountsTable accounts={accounts} />
+          </div>
 
-        {/* Right — Panels (1/3 width) */}
-        <div className="space-y-5">
-          <AgentHealthCard />
-          <RecentActionsPanel actions={actions} />
+          {/* Right — Panels (1/3 width) */}
+          <div className="space-y-5">
+            <AgentHealthCard />
+            <RecentActionsPanel actions={actions} />
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

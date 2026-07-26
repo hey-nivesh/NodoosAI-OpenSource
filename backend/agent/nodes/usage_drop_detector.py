@@ -1,4 +1,5 @@
 from datetime import date, timedelta
+# pyrefly: ignore [missing-import]
 from sqlalchemy import select, func, text
 from db.session import AsyncSessionLocal
 from db.models import FactProductUsage
@@ -10,13 +11,18 @@ async def usage_drop_detector_node(state: WorkflowState) -> WorkflowState:
     the 7-day moving average activity vs 28-day moving average.
     Flags accounts with > 20% drop in usage.
     """
+    org_id = state.get("org_id")
     async with AsyncSessionLocal() as session:
         today = date.today()
         seven_days_ago = today - timedelta(days=7)
         twenty_eight_days_ago = today - timedelta(days=28)
 
-        # Pull all telemetry records
+        # Pull telemetry for this org (or all records if no org_id set)
         stmt = select(FactProductUsage)
+        if org_id:
+            stmt = stmt.where(
+                (FactProductUsage.org_id == org_id) | (FactProductUsage.org_id.is_(None))
+            )
         res = await session.execute(stmt)
         records = res.scalars().all()
 

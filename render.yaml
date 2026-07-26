@@ -1,7 +1,9 @@
 services:
   - type: web
     name: nodoos-ai-backend
-    env: python
+    runtime: python
+    plan: free
+    rootDir: backend
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn api.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /api/health
@@ -33,6 +35,8 @@ services:
       - key: SUPABASE_JWT_SECRET
         sync: false
       - key: FRONTEND_URL
+        sync: false
+      - key: BACKEND_URL
         sync: false
       - key: ALLOWED_ORIGINS
         sync: false

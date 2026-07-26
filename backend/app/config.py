@@ -1,4 +1,5 @@
 import os
+# pyrefly: ignore [missing-import]
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Optional
 
@@ -28,8 +29,9 @@ class Settings(BaseSettings):
     NOTIFICATION_EMAIL_FROM: str = "alerts@nodoos.ai"
     NOTIFICATION_EMAIL_TO: str = "csm-team@example.com"
 
-    # ── Frontend / CORS ───────────────────────────────────────
+    # ── Frontend / Backend URLs & CORS ──────────────────────────
     FRONTEND_URL: str = "http://localhost:3000"
+    BACKEND_URL: Optional[str] = None
     ALLOWED_ORIGINS: str = "http://localhost:3000"  # comma-separated for prod
 
     # ── Observability ─────────────────────────────────────────

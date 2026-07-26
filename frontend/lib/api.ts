@@ -137,8 +137,9 @@ export async function triggerAgentRun(): Promise<RunAgentResponse> {
   const headers = await getAuthHeaders();
   const res = await fetch(`${API_BASE}/api/agent/run`, { method: "POST", headers });
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: "Execution failed" }));
-    throw new Error(err.detail || "Agent execution failed");
+    const err = await res.json().catch(() => ({ detail: `HTTP ${res.status}: Execution failed` }));
+    // Prefix status code so frontend can branch on it
+    throw new Error(`${res.status}: ${err.detail || "Agent execution failed"}`);
   }
   return res.json();
 }
