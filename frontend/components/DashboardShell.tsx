@@ -7,7 +7,22 @@ import { fetchNotifications } from "@/lib/api";
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(false);
   const [unreadNotifsCount, setUnreadNotifsCount] = useState(0);
+
+  // Load collapse state preference on client mount
+  useEffect(() => {
+    const stored = localStorage.getItem("sidebar-collapsed");
+    if (stored === "true") {
+      setIsCollapsed(true);
+    }
+  }, []);
+
+  const handleToggleCollapse = () => {
+    const nextState = !isCollapsed;
+    setIsCollapsed(nextState);
+    localStorage.setItem("sidebar-collapsed", String(nextState));
+  };
 
   useEffect(() => {
     async function getNotifs() {
@@ -24,8 +39,15 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex h-screen overflow-hidden bg-background">
       {/* Sidebar for Desktop */}
-      <div className="hidden md:flex h-full shrink-0">
-        <DashboardSidebar />
+      <div
+        className={`hidden md:flex h-full shrink-0 transition-all duration-300 ease-in-out ${
+          isCollapsed ? "w-[76px]" : "w-60"
+        }`}
+      >
+        <DashboardSidebar
+          isCollapsed={isCollapsed}
+          onToggleCollapse={handleToggleCollapse}
+        />
       </div>
 
       {/* Sidebar Drawer for Mobile */}
@@ -33,7 +55,9 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         <div className="fixed inset-0 z-40 flex md:hidden">
           <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setSidebarOpen(false)} />
           <div className="relative z-10 flex h-full w-60 flex-col animate-slide-in">
-            <DashboardSidebar onNavigate={() => setSidebarOpen(false)} />
+            <DashboardSidebar
+              onNavigate={() => setSidebarOpen(false)}
+            />
           </div>
         </div>
       )}
