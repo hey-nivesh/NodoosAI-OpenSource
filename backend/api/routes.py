@@ -94,3 +94,32 @@ async def trigger_agent_run_all(
             results.append({"org_id": org.id, "org_name": org.name, "success": False, "error": str(e)})
 
     return {"orgs_processed": len(results), "results": results}
+
+
+from pydantic import BaseModel
+from app.config import settings
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+@router.post("/auth/login", tags=["auth"])
+async def auth_login(body: LoginRequest):
+    # Support both "admin" and "admin@nodoos.ai"
+    if body.username in ("admin", "admin@nodoos.ai") and body.password == "nodoos-ai-admin":
+        import time
+        from jose import jwt
+        
+        JWT_SECRET = settings.SUPABASE_JWT_SECRET or "nodoos-fallback-jwt-secret-key-for-admin-login-987654321"
+        
+        payload = {
+            "sub": "admin-uuid-1111-2222-3333-4444",
+            "email": "admin@nodoos.ai",
+            "role": "admin",
+            "exp": int(time.time()) + 86400  # 24 hours
+        }
+        
+        token = jwt.encode(payload, JWT_SECRET, algorithm="HS256")
+        return {"access_token": token, "token_type": "bearer"}
+    
+    raise HTTPException(status_code=401, detail="Invalid username or password")
