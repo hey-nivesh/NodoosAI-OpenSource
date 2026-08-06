@@ -160,3 +160,5 @@ npm run dev
 ## 👥 License & Credits
 
 Designed with **Google Antigravity** as an open-source alternative to Snowflake CoCo CLI & Cortex. Free tier deployment compatible with Vercel, Render, and Supabase.
+
+admin, password will be "nodoos-ai-admin"

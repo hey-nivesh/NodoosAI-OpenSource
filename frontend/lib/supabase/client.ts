@@ -6,7 +6,11 @@ function getCookie(name: string) {
   return null;
 }
 
+let cachedClient: any = null;
+
 export function createClient() {
+  if (cachedClient) return cachedClient;
+
   const mockClient = {
     auth: {
       getUser: async () => {
@@ -112,5 +116,6 @@ export function createClient() {
     }
   };
 
-  return mockClient as any;
+  cachedClient = mockClient as any;
+  return cachedClient;
 }
