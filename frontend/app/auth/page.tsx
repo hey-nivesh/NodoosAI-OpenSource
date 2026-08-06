@@ -192,6 +192,14 @@ function AuthForm() {
             Authorized admin portal. All logins and operations are securely audited.
           </p>
         </div>
+        <div className="mt-8 text-center text-xs text-muted-foreground">
+          <p>
+            username - admin
+          </p>
+          <p>
+            password - nodoos-ai-admin
+          </p>
+        </div>
       </div>
     </div>
   );
